@@ -32,10 +32,10 @@ export function DataTableToolbar<TData>({
           <Button
             variant="ghost"
             onClick={() => table.resetColumnFilters()}
-            className="h-8 px-2 lg:px-3"
+            className="h-8 px-2 lg:px-3 gap-2"
           >
-            Réinitialiser
-            <Cross2Icon className="ml-2 h-4 w-4" />
+            <span className="hidden lg:inline">Réinitialiser</span>
+            <Cross2Icon className="h-4 w-4" />
           </Button>
         )}
       </div>
@@ -44,10 +44,10 @@ export function DataTableToolbar<TData>({
           variant="outline"
           size="sm"
           onClick={onRefresh}
-          className="h-8 px-2 lg:px-3"
+          className="h-8 px-2 lg:px-3 gap-2"
         >
-          <UpdateIcon className="mr-2 h-4 w-4" />
-          Actualiser
+          <UpdateIcon className="h-4 w-4" />
+          <span className="hidden sm:inline">Actualiser</span>
         </Button>
       )}
     </div>

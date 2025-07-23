@@ -36,7 +36,7 @@ export default async function Home() {
           <h1 className="text-xl font-semibold">Shortlinks</h1>
           
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
+            <span className="hidden sm:block text-sm text-muted-foreground">
               {user.given_name && user.family_name 
                 ? `${user.given_name} ${user.family_name}`
                 : user.given_name || user.email
