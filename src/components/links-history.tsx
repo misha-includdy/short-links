@@ -129,7 +129,7 @@ export function LinksHistory() {
       cell: ({ row }: { row: Row<Link> }) => {
         const link = row.original;
         return (
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+          <div>
             <Button 
               variant="outline" 
               size="sm" 
