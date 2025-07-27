@@ -17,10 +17,20 @@ export async function GET(
     }
 
     // Get the original URL from Redis
-    const originalUrl = await redis.get(slug);
+    const linkData = await redis.get(slug);
 
-    if (!originalUrl) {
+    if (!linkData) {
       return NextResponse.json({ error: "Lien non trouvé" }, { status: 404 });
+    }
+
+    let originalUrl: string;
+    try {
+      // Try to parse as JSON (new format with creation date)
+      const parsed = JSON.parse(linkData as string);
+      originalUrl = parsed.originalUrl;
+    } catch {
+      // Fallback for old format (just URL string)
+      originalUrl = linkData as string;
     }
 
     return NextResponse.json({ 

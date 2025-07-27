@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,16 +12,116 @@ interface UrlShortenerProps {
 }
 
 export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
-  const [url, setUrl] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [utmSource, setUtmSource] = useState("");
+  const [utmMedium, setUtmMedium] = useState("");
+  const [utmCampaign, setUtmCampaign] = useState("");
+  const [utmTerm, setUtmTerm] = useState("");
+  const [utmContent, setUtmContent] = useState("");
+  const [utmId, setUtmId] = useState("");
   const [slug, setSlug] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ originalUrl: string; shortUrl: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const hasExtractedUtm = useRef(false);
+
+  // Extract UTM parameters from base URL only once when first entered
+  useEffect(() => {
+    if (!baseUrl.trim()) {
+      // Clear UTM fields if base URL is empty
+      setUtmSource("");
+      setUtmMedium("");
+      setUtmCampaign("");
+      setUtmTerm("");
+      setUtmContent("");
+      setUtmId("");
+      hasExtractedUtm.current = false;
+      return;
+    }
+
+    // Only extract UTM parameters if we haven't done it yet for this URL
+    if (!hasExtractedUtm.current) {
+      try {
+        const url = new URL(baseUrl);
+        const params = new URLSearchParams(url.search);
+        
+        // Extract UTM parameters and populate fields
+        setUtmSource(params.get('utm_source') || "");
+        setUtmMedium(params.get('utm_medium') || "");
+        setUtmCampaign(params.get('utm_campaign') || "");
+        setUtmTerm(params.get('utm_term') || "");
+        setUtmContent(params.get('utm_content') || "");
+        setUtmId(params.get('utm_id') || "");
+        
+        // Mark as extracted so we don't do it again
+        hasExtractedUtm.current = true;
+      } catch (error) {
+        // If baseUrl is not a valid URL, clear UTM fields
+        setUtmSource("");
+        setUtmMedium("");
+        setUtmCampaign("");
+        setUtmTerm("");
+        setUtmContent("");
+        setUtmId("");
+        hasExtractedUtm.current = false;
+      }
+    }
+  }, [baseUrl]);
+
+  // Reset extraction flag when base URL is cleared
+  const handleBaseUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setBaseUrl(newValue);
+    
+    // Reset extraction flag if URL is cleared
+    if (!newValue.trim()) {
+      hasExtractedUtm.current = false;
+    }
+  };
+
+  // Compute the full URL with UTM parameters
+  const fullUrl = useMemo(() => {
+    if (!baseUrl.trim()) return "";
+
+    try {
+      const url = new URL(baseUrl);
+      
+      // Create a new URLSearchParams object with existing parameters
+      const existingParams = new URLSearchParams(url.search);
+      
+      // Update or add UTM parameters
+      if (utmSource.trim()) existingParams.set('utm_source', utmSource.trim());
+      if (utmMedium.trim()) existingParams.set('utm_medium', utmMedium.trim());
+      if (utmCampaign.trim()) existingParams.set('utm_campaign', utmCampaign.trim());
+      if (utmTerm.trim()) existingParams.set('utm_term', utmTerm.trim());
+      if (utmContent.trim()) existingParams.set('utm_content', utmContent.trim());
+      if (utmId.trim()) existingParams.set('utm_id', utmId.trim());
+      
+      // Update the URL with all parameters
+      url.search = existingParams.toString();
+      
+      return url.toString();
+    } catch (error) {
+      // If baseUrl is not a valid URL, return it as is
+      return baseUrl;
+    }
+  }, [baseUrl, utmSource, utmMedium, utmCampaign, utmTerm, utmContent, utmId]);
+
+  // Check if the full URL is valid
+  const isUrlValid = useMemo(() => {
+    if (!fullUrl.trim()) return true; // Empty URL is considered valid (not an error)
+    try {
+      new URL(fullUrl);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [fullUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim() || !slug.trim()) return;
+    if (!baseUrl.trim() || !slug.trim() || !isUrlValid) return;
 
     setLoading(true);
     setError(null);
@@ -34,7 +134,7 @@ export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url, slug }),
+        body: JSON.stringify({ url: fullUrl, slug }),
       });
       
       const data = await response.json();
@@ -45,17 +145,29 @@ export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
       }
 
       setResult({
-        originalUrl: data.originalUrl || url,
+        originalUrl: data.originalUrl || fullUrl,
         shortUrl: data.shortUrl
       });
 
       // Clear form
-      setUrl("");
+      setBaseUrl("");
+      setUtmSource("");
+      setUtmMedium("");
+      setUtmCampaign("");
+      setUtmTerm("");
+      setUtmContent("");
+      setUtmId("");
       setSlug("");
+      hasExtractedUtm.current = false;
 
       // Notify parent component to refresh history
       if (onLinkCreated) {
-        onLinkCreated();
+        try {
+          onLinkCreated();
+        } catch (error) {
+          console.error('Error refreshing history:', error);
+          // Don't show this error to the user since the link was created successfully
+        }
       }
     } catch {
       setError("Erreur de connexion au serveur");
@@ -85,16 +197,93 @@ export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
     <div className="w-full space-y-6">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="url">URL</Label>
+          <Label htmlFor="baseUrl">URL de base</Label>
           <Input
-            id="url"
+            id="baseUrl"
             type="url"
-            placeholder="https://exemple.com?utm_source=shortlinks&utm_medium=link&utm_campaign=promo"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://exemple.com"
+            value={baseUrl}
+            onChange={handleBaseUrlChange}
             required
           />
         </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="utmSource">UTM Source</Label>
+            <Input
+              id="utmSource"
+              type="text"
+              placeholder="google"
+              value={utmSource}
+              onChange={(e) => setUtmSource(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="utmMedium">UTM Medium</Label>
+            <Input
+              id="utmMedium"
+              type="text"
+              placeholder="cpc"
+              value={utmMedium}
+              onChange={(e) => setUtmMedium(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="utmCampaign">UTM Campaign</Label>
+            <Input
+              id="utmCampaign"
+              type="text"
+              placeholder="promo-ete"
+              value={utmCampaign}
+              onChange={(e) => setUtmCampaign(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="utmTerm">UTM Term</Label>
+            <Input
+              id="utmTerm"
+              type="text"
+              placeholder="mots-cles"
+              value={utmTerm}
+              onChange={(e) => setUtmTerm(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="utmContent">UTM Content</Label>
+            <Input
+              id="utmContent"
+              type="text"
+              placeholder="banner-1"
+              value={utmContent}
+              onChange={(e) => setUtmContent(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="utmId">UTM ID</Label>
+            <Input
+              id="utmId"
+              type="text"
+              placeholder="123456789"
+              value={utmId}
+              onChange={(e) => setUtmId(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {fullUrl && (
+          <div className="p-3 bg-muted/50 rounded-md border">
+            <Label className="text-sm font-medium">URL complète générée</Label>
+            <p className="text-sm text-muted-foreground break-all mt-1">
+              {isUrlValid ? fullUrl : <span className="text-red-500">URL invalide</span>}
+            </p>
+          </div>
+        )}
         
         <div className="space-y-2">
           <Label htmlFor="slug">Slug</Label>
@@ -107,11 +296,20 @@ export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
             required
           />
         </div>
+
+        {slug.trim() && (
+          <div className="p-3 bg-muted/50 rounded-md border">
+            <Label className="text-sm font-medium">URL courte générée</Label>
+            <p className="text-sm text-muted-foreground break-all mt-1">
+              {`https://includdy.com/p/${slug.trim()}`}
+            </p>
+          </div>
+        )}
         
         <Button 
           type="submit" 
           className="w-full" 
-          disabled={loading || !url.trim() || !slug.trim()}
+          disabled={loading || !baseUrl.trim() || !slug.trim() || !isUrlValid}
         >
           {loading ? "Génération..." : "Générer"}
         </Button>

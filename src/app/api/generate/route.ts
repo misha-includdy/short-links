@@ -24,16 +24,32 @@ export async function POST(request: NextRequest) {
     const finalSlug = slug.trim();
 
     // Check if slug already exists in Redis
-    const existingUrl = await redis.get(finalSlug);
+    const existingData = await redis.get(finalSlug);
     
-    if (existingUrl) {
-      return NextResponse.json({ 
-        error: "Ce slug existe déjà. Veuillez choisir un autre slug." 
-      }, { status: 409 });
+    if (existingData) {
+      // Check if it's the new JSON format or old string format
+      try {
+        const parsed = JSON.parse(existingData as string);
+        if (parsed && typeof parsed.originalUrl === 'string') {
+          // New format exists
+          return NextResponse.json({ 
+            error: "Ce slug existe déjà. Veuillez choisir un autre slug." 
+          }, { status: 409 });
+        }
+      } catch {
+        // Old format exists (just a string)
+        return NextResponse.json({ 
+          error: "Ce slug existe déjà. Veuillez choisir un autre slug." 
+        }, { status: 409 });
+      }
     }
 
-    // Store the slug-URL pair in Redis
-    await redis.set(finalSlug, url);
+    // Store the slug-URL pair in Redis with creation date
+    const linkData = {
+      originalUrl: url,
+      createdAt: new Date().toISOString()
+    };
+    await redis.set(finalSlug, JSON.stringify(linkData));
 
     const shortUrl = `https://includdy.com/p/${finalSlug}`;
     

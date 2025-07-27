@@ -9,11 +9,14 @@ import {
   Row,
 } from "@tanstack/react-table";
 import { ArrowUpIcon, ArrowDownIcon } from "@radix-ui/react-icons";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 interface Link {
   slug: string;
   originalUrl: string;
   shortUrl: string;
+  createdAt: string | null;
 }
 
 export function LinksHistory() {
@@ -21,6 +24,7 @@ export function LinksHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+  const [cleaning, setCleaning] = useState(false);
 
   const fetchLinks = async () => {
     try {
@@ -33,11 +37,44 @@ export function LinksHistory() {
         return;
       }
 
-      setLinks(data.links || []);
+      // Validate the data structure
+      const validLinks = (data.links || []).filter((link: any) => {
+        if (!link || typeof link !== 'object') {
+          console.error('Invalid link object:', link);
+          return false;
+        }
+        if (typeof link.originalUrl !== 'string') {
+          console.error('Invalid originalUrl:', link.originalUrl);
+          return false;
+        }
+        return true;
+      });
+
+      setLinks(validLinks);
     } catch {
       setError("Erreur de connexion au serveur");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cleanupCorruptedData = async () => {
+    try {
+      setCleaning(true);
+      const response = await fetch('/api/links', { method: 'DELETE' });
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log(data.message);
+        // Refresh the links after cleanup
+        await fetchLinks();
+      } else {
+        console.error('Cleanup failed:', data.error);
+      }
+    } catch (error) {
+      console.error('Error during cleanup:', error);
+    } finally {
+      setCleaning(false);
     }
   };
 
@@ -76,20 +113,11 @@ export function LinksHistory() {
               Lien
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 {column.getIsSorted() === "desc" ? (
-                  <>
-                    <ArrowDownIcon className="h-3 w-3" />
-                    <span>(nouveaux d&apos;abord)</span>
-                  </>
+                  <ArrowDownIcon className="h-3 w-3" />
                 ) : column.getIsSorted() === "asc" ? (
-                  <>
-                    <ArrowUpIcon className="h-3 w-3" />
-                    <span>(anciens d&apos;abord)</span>
-                  </>
+                  <ArrowUpIcon className="h-3 w-3" />
                 ) : (
-                  <>
-                    <ArrowDownIcon className="h-3 w-3" />
-                    <span>(nouveaux d&apos;abord)</span>
-                  </>
+                  <ArrowDownIcon className="h-3 w-3" />
                 )}
               </div>
             </div>
@@ -98,6 +126,13 @@ export function LinksHistory() {
       },
       cell: ({ row }: { row: Row<Link> }) => {
         const link = row.original;
+        
+        // Ensure we have valid data
+        if (!link || typeof link.originalUrl !== 'string') {
+          console.error('Invalid link data in cell:', link);
+          return <div className="text-xs text-red-500">Erreur de données</div>;
+        }
+        
         return (
           <div className="space-y-1">
             <a 
@@ -123,13 +158,67 @@ export function LinksHistory() {
       },
     },
     {
+      accessorKey: "createdAt",
+      header: ({ column }: { column: Column<Link> }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-auto p-0 font-medium hover:bg-transparent"
+          >
+            <div className="flex items-center gap-2">
+              Date
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                {column.getIsSorted() === "desc" ? (
+                  <ArrowDownIcon className="h-3 w-3" />
+                ) : column.getIsSorted() === "asc" ? (
+                  <ArrowUpIcon className="h-3 w-3" />
+                ) : (
+                  <ArrowDownIcon className="h-3 w-3" />
+                )}
+              </div>
+            </div>
+          </Button>
+        );
+      },
+      size: 120,
+      cell: ({ row }: { row: Row<Link> }) => {
+        const link = row.original;
+        
+        // Ensure we have valid data
+        if (!link) {
+          console.error('Invalid link data in date cell:', link);
+          return <div className="text-xs text-red-500">Erreur</div>;
+        }
+        
+        if (!link.createdAt) {
+          return (
+            <div className="text-xs text-muted-foreground">
+              N/A
+            </div>
+          );
+        }
+        
+        const date = new Date(link.createdAt);
+        const dateStr = format(date, "dd MMM yyyy", { locale: fr });
+        const timeStr = format(date, "HH:mm", { locale: fr });
+        
+        return (
+          <div className="text-xs text-muted-foreground">
+            <div>{dateStr}</div>
+            <div>{timeStr}</div>
+          </div>
+        );
+      },
+    },
+    {
       id: "actions",
       header: "",
       size: 80,
       cell: ({ row }: { row: Row<Link> }) => {
         const link = row.original;
         return (
-          <div>
+          <div className="flex items-start">
             <Button 
               variant="outline" 
               size="sm" 
@@ -156,14 +245,23 @@ export function LinksHistory() {
     return (
       <div className="text-center py-8">
         <p className="text-sm text-muted-foreground">{error}</p>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="mt-2"
-          onClick={fetchLinks}
-        >
-          Réessayer
-        </Button>
+        <div className="flex gap-2 justify-center mt-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={fetchLinks}
+          >
+            Réessayer
+          </Button>
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={cleanupCorruptedData}
+            disabled={cleaning}
+          >
+            {cleaning ? "Nettoyage..." : "Nettoyer données corrompues"}
+          </Button>
+        </div>
       </div>
     );
   }

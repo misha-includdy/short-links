@@ -42,7 +42,7 @@ export function DataTable<TData, TValue>({
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [sorting, setSorting] = React.useState<SortingState>([
-    { id: "slug", desc: true }
+    { id: "createdAt", desc: true }
   ])
 
   const table = useReactTable({
@@ -68,7 +68,7 @@ export function DataTable<TData, TValue>({
         pageSize: 10,
       },
       sorting: [
-        { id: "slug", desc: true }
+        { id: "createdAt", desc: true }
       ],
     },
   })
@@ -98,25 +98,49 @@ export function DataTable<TData, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="group hover:bg-muted/50 transition-colors"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell 
-                      key={cell.id}
-                      className={cell.column.id === "actions" ? "text-right" : "max-w-0"}
-                      style={{ width: cell.column.getSize() !== 150 ? cell.column.getSize() : undefined }}
+              table.getRowModel().rows.map((row) => {
+                try {
+                  return (
+                    <TableRow
+                      key={row.id}
+                      className="group hover:bg-muted/50 transition-colors"
                     >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+                      {row.getVisibleCells().map((cell) => {
+                        try {
+                          return (
+                            <TableCell 
+                              key={cell.id}
+                              className={cell.column.id === "actions" ? "text-right" : "max-w-0"}
+                              style={{ width: cell.column.getSize() !== 150 ? cell.column.getSize() : undefined }}
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </TableCell>
+                          );
+                        } catch (cellError) {
+                          console.error('Error rendering cell:', cellError, cell);
+                          return (
+                            <TableCell key={cell.id} className="text-red-500">
+                              Erreur de rendu
+                            </TableCell>
+                          );
+                        }
+                      })}
+                    </TableRow>
+                  );
+                } catch (rowError) {
+                  console.error('Error rendering row:', rowError, row);
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell colSpan={columns.length} className="text-red-500">
+                        Erreur de rendu
+                      </TableCell>
+                    </TableRow>
+                  );
+                }
+              })
             ) : (
               <TableRow>
                 <TableCell
