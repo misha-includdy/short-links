@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { UpdateIcon } from "@radix-ui/react-icons";
 import { UrlShortener } from "@/components/url-shortener";
 import { LinksHistory } from "@/components/links-history";
 
@@ -10,10 +8,6 @@ export function Dashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleLinkCreated = () => {
-    setRefreshKey(prev => prev + 1);
-  };
-
-  const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
   };
 

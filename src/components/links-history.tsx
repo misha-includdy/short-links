@@ -38,7 +38,7 @@ export function LinksHistory() {
       }
 
       // Validate the data structure
-      const validLinks = (data.links || []).filter((link: any) => {
+      const validLinks = (data.links || []).filter((link: Link) => {
         if (!link || typeof link !== 'object') {
           console.error('Invalid link object:', link);
           return false;

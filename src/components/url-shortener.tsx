@@ -56,7 +56,7 @@ export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
         
         // Mark as extracted so we don't do it again
         hasExtractedUtm.current = true;
-      } catch (error) {
+      } catch (_error) {
         // If baseUrl is not a valid URL, clear UTM fields
         setUtmSource("");
         setUtmMedium("");
@@ -102,7 +102,7 @@ export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
       url.search = existingParams.toString();
       
       return url.toString();
-    } catch (error) {
+    } catch (_error) {
       // If baseUrl is not a valid URL, return it as is
       return baseUrl;
     }
@@ -169,7 +169,7 @@ export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
           // Don't show this error to the user since the link was created successfully
         }
       }
-    } catch {
+    } catch (_error) {
       setError("Erreur de connexion au serveur");
     } finally {
       setLoading(false);

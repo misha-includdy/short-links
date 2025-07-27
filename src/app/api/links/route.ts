@@ -18,7 +18,7 @@ export async function GET() {
           try {
             parsed = JSON.parse(linkData);
             isJsonString = true;
-          } catch (parseError) {
+          } catch (_parseError) {
             // Not a JSON string, continue to other checks
           }
         }
@@ -49,7 +49,7 @@ export async function GET() {
               createdAt: null // No creation date for old entries
             });
             console.log(`Added old format link: ${key}`);
-          } catch (urlError) {
+          } catch (_urlError) {
             console.warn(`Skipping invalid URL for key ${key}:`, linkData);
           }
         } else {
@@ -96,7 +96,7 @@ export async function DELETE() {
           try {
             parsed = JSON.parse(linkData);
             isJsonString = true;
-          } catch (parseError) {
+          } catch (_parseError) {
             // Not a JSON string, continue to other checks
           }
         }
@@ -114,7 +114,7 @@ export async function DELETE() {
             // Validate it's a proper URL
             new URL(linkData);
             isValid = true;
-          } catch (urlError) {
+          } catch (_urlError) {
             // Invalid URL, will be cleaned
           }
         }
