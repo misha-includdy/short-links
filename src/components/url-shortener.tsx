@@ -40,6 +40,24 @@ export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
       return;
     }
 
+    // Check if base URL contains UTM parameters
+    try {
+      const url = new URL(baseUrl);
+      const params = new URLSearchParams(url.search);
+      const utmParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id'];
+      const hasUtmParams = utmParams.some(param => params.has(param));
+      
+      if (hasUtmParams) {
+        setError("L'URL de base ne doit pas contenir de paramètres UTM. Utilisez les champs UTM séparés.");
+        return;
+      } else {
+        setError(null);
+      }
+    } catch (_error) {
+      // If baseUrl is not a valid URL, clear error
+      setError(null);
+    }
+
     // Only extract UTM parameters if we haven't done it yet for this URL
     if (!hasExtractedUtm.current) {
       try {
@@ -214,7 +232,7 @@ export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
             <Input
               id="utmSource"
               type="text"
-              placeholder="google"
+              placeholder="linkedin"
               value={utmSource}
               onChange={(e) => setUtmSource(e.target.value)}
             />
@@ -225,7 +243,7 @@ export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
             <Input
               id="utmMedium"
               type="text"
-              placeholder="cpc"
+              placeholder="social"
               value={utmMedium}
               onChange={(e) => setUtmMedium(e.target.value)}
             />
@@ -258,7 +276,7 @@ export function UrlShortener({ onLinkCreated }: UrlShortenerProps) {
             <Input
               id="utmContent"
               type="text"
-              placeholder="banner-1"
+              placeholder="comment"
               value={utmContent}
               onChange={(e) => setUtmContent(e.target.value)}
             />
