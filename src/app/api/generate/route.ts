@@ -1,6 +1,6 @@
 import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { redis } from "@/lib/redis";
+import { supabase } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
   const { getUser } = getKindeServerSession();
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { url, slug } = await request.json();
-    
+
     if (!url) {
       return NextResponse.json({ error: "URL requise" }, { status: 400 });
     }
@@ -23,36 +23,31 @@ export async function POST(request: NextRequest) {
 
     const finalSlug = slug.trim();
 
-    // Check if slug already exists in Redis
-    const existingData = await redis.get(finalSlug);
-    
-    if (existingData) {
-      // Check if it's the new JSON format or old string format
-      try {
-        const parsed = JSON.parse(existingData as string);
-        if (parsed && typeof parsed.originalUrl === 'string') {
-          // New format exists
-          return NextResponse.json({ 
-            error: "Ce slug existe déjà. Veuillez choisir un autre slug." 
-          }, { status: 409 });
-        }
-      } catch {
-        // Old format exists (just a string)
-        return NextResponse.json({ 
-          error: "Ce slug existe déjà. Veuillez choisir un autre slug." 
-        }, { status: 409 });
-      }
+    // Check if slug already exists
+    const { data: existing } = await supabase
+      .from('short_links')
+      .select('id')
+      .eq('slug', finalSlug)
+      .single();
+
+    if (existing) {
+      return NextResponse.json({
+        error: "Ce slug existe déjà. Veuillez choisir un autre slug."
+      }, { status: 409 });
     }
 
-    // Store the slug-URL pair in Redis with creation date
-    const linkData = {
-      originalUrl: url,
-      createdAt: new Date().toISOString()
-    };
-    await redis.set(finalSlug, JSON.stringify(linkData));
+    // Insert new short link
+    const { error } = await supabase
+      .from('short_links')
+      .insert({ slug: finalSlug, destination: url });
+
+    if (error) {
+      console.error("Supabase insert error:", error);
+      return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    }
 
     const shortUrl = `https://includdy.com/p/${finalSlug}`;
-    
+
     return NextResponse.json({
       originalUrl: url,
       shortUrl: shortUrl,
@@ -61,7 +56,7 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString()
     });
   } catch (error) {
-    console.error("Redis error:", error);
+    console.error("Error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-} 
+}

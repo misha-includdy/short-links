@@ -16,6 +16,7 @@ interface Link {
   slug: string;
   originalUrl: string;
   shortUrl: string;
+  clicks: number;
   createdAt: string | null;
 }
 
@@ -24,8 +25,6 @@ export function LinksHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
-  const [cleaning, setCleaning] = useState(false);
-
   const fetchLinks = async () => {
     try {
       setLoading(true);
@@ -55,26 +54,6 @@ export function LinksHistory() {
       setError("Erreur de connexion au serveur");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const cleanupCorruptedData = async () => {
-    try {
-      setCleaning(true);
-      const response = await fetch('/api/links', { method: 'DELETE' });
-      const data = await response.json();
-      
-      if (response.ok) {
-        console.log(data.message);
-        // Refresh the links after cleanup
-        await fetchLinks();
-      } else {
-        console.error('Cleanup failed:', data.error);
-      }
-    } catch (error) {
-      console.error('Error during cleanup:', error);
-    } finally {
-      setCleaning(false);
     }
   };
 
@@ -153,6 +132,18 @@ export function LinksHistory() {
             >
               {link.originalUrl}
             </a>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "clicks",
+      header: "Clics",
+      size: 60,
+      cell: ({ row }: { row: Row<Link> }) => {
+        return (
+          <div className="text-sm text-muted-foreground tabular-nums">
+            {row.original.clicks ?? 0}
           </div>
         );
       },
@@ -246,20 +237,12 @@ export function LinksHistory() {
       <div className="text-center py-8">
         <p className="text-sm text-muted-foreground">{error}</p>
         <div className="flex gap-2 justify-center mt-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={fetchLinks}
           >
             Réessayer
-          </Button>
-          <Button 
-            variant="destructive" 
-            size="sm" 
-            onClick={cleanupCorruptedData}
-            disabled={cleaning}
-          >
-            {cleaning ? "Nettoyage..." : "Nettoyer données corrompues"}
           </Button>
         </div>
       </div>

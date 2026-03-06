@@ -1,72 +1,29 @@
 import { NextResponse } from 'next/server';
-import { redis } from '@/lib/redis';
+import { supabase } from '@/lib/supabase';
 
 export async function GET() {
   try {
-    const keys = await redis.keys('*');
-    const links = [];
+    const { data, error } = await supabase
+      .from('short_links')
+      .select('slug, destination, clicks, created_at')
+      .order('created_at', { ascending: false });
 
-    for (const key of keys) {
-      const linkData = await redis.get(key);
-      if (linkData) {
-        // Handle different data types that might be stored in Redis
-        let parsed = null;
-        let isJsonString = false;
-        
-        // First, try to parse as JSON string
-        if (typeof linkData === 'string') {
-          try {
-            parsed = JSON.parse(linkData);
-            isJsonString = true;
-          } catch (_parseError) {
-            // Not a JSON string, continue to other checks
-          }
-        }
-        
-        // If it's already an object (not a string), use it directly
-        if (!isJsonString && typeof linkData === 'object' && linkData !== null) {
-          parsed = linkData;
-        }
-        
-        // Process the parsed data
-        if (parsed && typeof parsed.originalUrl === 'string' && parsed.originalUrl.trim() !== '') {
-          links.push({
-            slug: key,
-            originalUrl: parsed.originalUrl,
-            shortUrl: `https://includdy.com/p/${key}`,
-            createdAt: parsed.createdAt || null
-          });
-          console.log(`Added link: ${key}`);
-        } else if (typeof linkData === 'string' && linkData.trim() !== '') {
-          // Handle old format (direct URL string)
-          try {
-            // Validate it's a proper URL
-            new URL(linkData);
-            links.push({
-              slug: key,
-              originalUrl: linkData,
-              shortUrl: `https://includdy.com/p/${key}`,
-              createdAt: null // No creation date for old entries
-            });
-            console.log(`Added old format link: ${key}`);
-          } catch (_urlError) {
-            console.warn(`Skipping invalid URL for key ${key}:`, linkData);
-          }
-        } else {
-          console.warn(`Skipping invalid data for key ${key}:`, linkData);
-        }
-      }
+    if (error) {
+      console.error('Supabase error:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la récupération des liens' },
+        { status: 500 }
+      );
     }
 
-    // Sort by creation date (newest first) if available
-    links.sort((a, b) => {
-      if (!a.createdAt && !b.createdAt) return 0;
-      if (!a.createdAt) return 1; // Put entries without date at the end
-      if (!b.createdAt) return -1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+    const links = (data || []).map(row => ({
+      slug: row.slug,
+      originalUrl: row.destination,
+      shortUrl: `https://includdy.com/p/${row.slug}`,
+      clicks: row.clicks,
+      createdAt: row.created_at,
+    }));
 
-    console.log('Returning links:', links.length, 'items');
     return NextResponse.json({ links });
   } catch (error) {
     console.error('Error fetching links:', error);
@@ -76,65 +33,3 @@ export async function GET() {
     );
   }
 }
-
-export async function DELETE() {
-  try {
-    const keys = await redis.keys('*');
-    let cleanedCount = 0;
-
-    for (const key of keys) {
-      const linkData = await redis.get(key);
-      if (linkData) {
-        let isValid = false;
-        
-        // Handle different data types that might be stored in Redis
-        let parsed = null;
-        let isJsonString = false;
-        
-        // First, try to parse as JSON string
-        if (typeof linkData === 'string') {
-          try {
-            parsed = JSON.parse(linkData);
-            isJsonString = true;
-          } catch (_parseError) {
-            // Not a JSON string, continue to other checks
-          }
-        }
-        
-        // If it's already an object (not a string), use it directly
-        if (!isJsonString && typeof linkData === 'object' && linkData !== null) {
-          parsed = linkData;
-        }
-        
-        // Check if the data is valid
-        if (parsed && typeof parsed.originalUrl === 'string' && parsed.originalUrl.trim() !== '') {
-          isValid = true;
-        } else if (typeof linkData === 'string' && linkData.trim() !== '') {
-          try {
-            // Validate it's a proper URL
-            new URL(linkData);
-            isValid = true;
-          } catch (_urlError) {
-            // Invalid URL, will be cleaned
-          }
-        }
-        
-        if (!isValid) {
-          await redis.del(key);
-          cleanedCount++;
-          console.log(`Cleaned corrupted entry: ${key}`);
-        }
-      }
-    }
-
-    return NextResponse.json({ 
-      message: `Nettoyage terminé. ${cleanedCount} entrées corrompues supprimées.` 
-    });
-  } catch (error) {
-    console.error('Error cleaning corrupted data:', error);
-    return NextResponse.json(
-      { error: 'Erreur lors du nettoyage' },
-      { status: 500 }
-    );
-  }
-} 
