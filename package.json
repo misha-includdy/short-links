@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
-    "@kinde-oss/kinde-auth-nextjs": "^2.8.3",
+    "@kinde-oss/kinde-auth-nextjs": "^2.11.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
