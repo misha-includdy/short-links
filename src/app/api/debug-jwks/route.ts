@@ -17,7 +17,10 @@ export async function GET() {
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     const start = Date.now();
-    const response = await fetch(jwksUrl, { signal: controller.signal });
+    const response = await fetch(jwksUrl, {
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; IncluddyLink/1.0)" },
+    });
     clearTimeout(timeout);
 
     const headersObj: Record<string, string> = {};
